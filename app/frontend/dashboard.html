@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Campus Resource Booking</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="brand-dot"></span>
+      MMU Resource Booking
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html" class="active">Dashboard</a></li>
+      <li><a href="resources.html">Resources</a></li>
+      <li><a href="booking.html">New Booking</a></li>
+      <li><a href="my-bookings.html">My Bookings</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="avatar"></div>
+      <span class="nav-username"></span>
+      <button class="btn-logout">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <h1 id="welcome-msg">Welcome back!</h1>
+      <p>Here's an overview of campus resources and your recent activity.</p>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">🖥️</div>
+        <div class="stat-info">
+          <div class="value" id="stat-total">—</div>
+          <div class="label">Total Resources</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+          <div class="value" id="stat-available">—</div>
+          <div class="label">Available Now</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon amber">📅</div>
+        <div class="stat-info">
+          <div class="value" id="stat-mybookings">—</div>
+          <div class="label">My Bookings</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">🔧</div>
+        <div class="stat-info">
+          <div class="value" id="stat-maintenance">—</div>
+          <div class="label">Under Maintenance</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK BOOK -->
+    <div class="card" style="margin-bottom:28px;">
+      <div class="section-title">
+        Quick Actions
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a href="booking.html" class="btn btn-primary">📅 New Booking</a>
+        <a href="my-bookings.html" class="btn btn-outline">📋 My Bookings</a>
+        <a href="resources.html" class="btn btn-outline">🔍 Browse Resources</a>
+      </div>
+    </div>
+
+    <!-- RECENT BOOKINGS -->
+    <div class="card" style="margin-bottom:28px;">
+      <div class="section-title">
+        My Recent Bookings
+        <a href="my-bookings.html" class="btn btn-outline btn-sm">View All</a>
+      </div>
+      <div class="table-wrapper">
+        <table id="recent-table">
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Category</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="recent-body">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:30px">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- AVAILABLE RESOURCES (preview) -->
+    <div>
+      <div class="section-title">
+        Available Resources
+        <a href="resources.html" class="btn btn-outline btn-sm">View All</a>
+      </div>
+      <div class="resource-grid" id="resource-preview"></div>
+    </div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    (async () => {
+      const user = Session.require();
+      if (!user) return;
+      initNavbar(user);
+      document.getElementById('welcome-msg').textContent = `Welcome back, ${user.fullName.split(' ')[0]}!`;
+
+      const [resources, bookings] = await Promise.all([
+        API.get('/resources'),
+        API.get('/bookings/my'),
+      ]);
+      setResourceCache(resources);
+
+      document.getElementById('stat-total').textContent       = resources.length;
+      document.getElementById('stat-available').textContent   = resources.filter(r => r.status === 'Active').length;
+      document.getElementById('stat-mybookings').textContent  = bookings.length;
+      document.getElementById('stat-maintenance').textContent = resources.filter(r => r.status === 'Maintenance').length;
+
+      const recent = bookings.slice(0, 5);
+      const tbody  = document.getElementById('recent-body');
+      if (recent.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5">
+          <div class="empty-state" style="padding:30px">
+            <div class="empty-icon">📭</div>
+            <h3>No bookings yet</h3>
+            <p>Click "New Booking" to reserve a resource.</p>
+          </div>
+        </td></tr>`;
+      } else {
+        tbody.innerHTML = recent.map(b => {
+          const res = resourceById(b.resourceId);
+          return `<tr>
+            <td><strong>${res.icon || '📦'} ${res.name || 'Unknown'}</strong></td>
+            <td><span class="badge badge-blue">${res.category || '—'}</span></td>
+            <td>${fmt(b.startTime)}</td>
+            <td>${fmt(b.endTime)}</td>
+            <td>${statusBadge(b.status)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      const preview = resources.filter(r => r.status === 'Active').slice(0, 6);
+      document.getElementById('resource-preview').innerHTML = preview.map(r => `
+        <div class="resource-card">
+          <div class="resource-card-header">
+            <div class="res-icon">${r.icon}</div>
+            <h3>${r.name}</h3>
+            <div class="category">${r.category}</div>
+          </div>
+          <div class="resource-card-body">
+            <div class="res-meta">
+              <div class="res-meta-item">👥 Capacity: <strong>${r.capacity}</strong></div>
+              <div class="res-meta-item"><span class="badge badge-success">${r.status}</span></div>
+            </div>
+            <a href="booking.html?resource=${r.id}" class="btn btn-primary btn-sm btn-full">Book Now</a>
+          </div>
+        </div>
+      `).join('');
+    })();
+  </script>
+</body>
+</html>

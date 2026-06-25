@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Campus Resource Booking</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+
+      <div class="login-logo">
+        <div class="logo-box">🎓</div>
+        <h1>Campus Resource Booking</h1>
+        <p>Multimedia University</p>
+      </div>
+
+      <hr class="login-divider" />
+
+<div id="error-alert" class="alert alert-danger" style="display:none"></div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="email">MMU Email Address</label>
+          <input
+            type="email"
+            id="email"
+            placeholder="yourname@mmu.edu.my"
+            autocomplete="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="Enter your password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="login-btn">
+          Sign In
+        </button>
+      </form>
+
+
+</div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (Session.get()) window.location.href = 'dashboard.html';
+
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const email    = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      const alertEl  = document.getElementById('error-alert');
+      const btn      = document.getElementById('login-btn');
+
+      alertEl.style.display = 'none';
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+
+      try {
+        const data = await API.post('/auth/login', { email, password });
+        Session.set(data.user);
+        window.location.href = data.user.role === 'Admin' ? 'admin.html' : 'dashboard.html';
+      } catch (err) {
+        alertEl.textContent = '❌ ' + (err.error || 'Invalid email or password. Please try again.');
+        alertEl.style.display = 'block';
+        btn.textContent = 'Sign In';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

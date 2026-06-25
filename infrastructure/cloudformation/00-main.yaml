@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Campus Booking — Master (nested) stack.
+  Deploys all stacks in order: VPC → SGs → IAM → RDS → EC2/ALB → S3 → WAF/CloudTrail.
+  Upload all child templates to an S3 bucket first, then deploy this stack.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: campus-booking
+
+  TemplatesBucketUrl:
+    Type: String
+    Description: >
+      S3 URL prefix where child templates are stored.
+      Example: https://s3.amazonaws.com/my-cfn-templates/campus-booking
+
+  AlertEmail:
+    Type: String
+    Description: Email for security alarm notifications
+
+Resources:
+
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/01-vpc.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+      TimeoutInMinutes: 15
+
+  SgStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VpcStack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/02-security-groups.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+      TimeoutInMinutes: 10
+
+  S3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/06-s3.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+      TimeoutInMinutes: 10
+
+  RdsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: SgStack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/04-rds.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+      TimeoutInMinutes: 30
+
+  IamStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: RdsStack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/03-iam.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+      TimeoutInMinutes: 10
+
+  Ec2AlbStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - IamStack
+      - RdsStack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/05-ec2-alb.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        DbEndpoint: !GetAtt RdsStack.Outputs.DBEndpoint
+      TimeoutInMinutes: 20
+
+  WafCloudTrailStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - Ec2AlbStack
+      - S3Stack
+    Properties:
+      TemplateURL: !Sub '${TemplatesBucketUrl}/07-waf-cloudtrail.yaml'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        AlbArn: !GetAtt Ec2AlbStack.Outputs.AlbArn
+        AlertEmail: !Ref AlertEmail
+      TimeoutInMinutes: 15
+
+Outputs:
+  AppUrl:
+    Description: Application URL (HTTP — use HTTPS with a custom domain + ACM cert in production)
+    Value: !Sub 'http://${Ec2AlbStack.Outputs.AlbDnsName}'

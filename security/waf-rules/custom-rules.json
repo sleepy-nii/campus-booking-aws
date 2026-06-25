@@ -1,0 +1,78 @@
+{
+  "Description": "Custom WAF rules for Campus Booking — supplement AWS Managed Rules",
+  "Rules": [
+    {
+      "Name": "BlockAdminPathFromPublic",
+      "Priority": 10,
+      "Action": { "Block": {} },
+      "Statement": {
+        "AndStatement": {
+          "Statements": [
+            {
+              "ByteMatchStatement": {
+                "SearchString": "/api/users",
+                "FieldToMatch": { "UriPath": {} },
+                "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                "PositionalConstraint": "STARTS_WITH"
+              }
+            },
+            {
+              "NotStatement": {
+                "Statement": {
+                  "IPSetReferenceStatement": {
+                    "ARN": "REPLACE_WITH_TRUSTED_IP_SET_ARN"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "BlockAdminPath"
+      }
+    },
+    {
+      "Name": "BlockScannerUserAgents",
+      "Priority": 11,
+      "Action": { "Block": {} },
+      "Statement": {
+        "OrStatement": {
+          "Statements": [
+            {
+              "ByteMatchStatement": {
+                "SearchString": "sqlmap",
+                "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } },
+                "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                "PositionalConstraint": "CONTAINS"
+              }
+            },
+            {
+              "ByteMatchStatement": {
+                "SearchString": "nikto",
+                "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } },
+                "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                "PositionalConstraint": "CONTAINS"
+              }
+            },
+            {
+              "ByteMatchStatement": {
+                "SearchString": "nmap",
+                "FieldToMatch": { "SingleHeader": { "Name": "user-agent" } },
+                "TextTransformations": [{ "Priority": 0, "Type": "LOWERCASE" }],
+                "PositionalConstraint": "CONTAINS"
+              }
+            }
+          ]
+        }
+      },
+      "VisibilityConfig": {
+        "SampledRequestsEnabled": true,
+        "CloudWatchMetricsEnabled": true,
+        "MetricName": "BlockScannerUA"
+      }
+    }
+  ]
+}

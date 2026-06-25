@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Bookings — Campus Resource Booking</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="brand-dot"></span>
+      MMU Resource Booking
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html">Dashboard</a></li>
+      <li><a href="resources.html">Resources</a></li>
+      <li><a href="booking.html">New Booking</a></li>
+      <li><a href="my-bookings.html" class="active">My Bookings</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="avatar"></div>
+      <span class="nav-username"></span>
+      <button class="btn-logout">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <div class="page-header">
+      <h1>My Bookings</h1>
+      <p>View and manage all your resource reservations.</p>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar" style="margin-bottom:20px;">
+      <input type="text" id="search" placeholder="🔍 Search resource or purpose…" />
+      <select id="status-filter">
+        <option value="">All Status</option>
+        <option value="Confirmed">Confirmed</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+      <select id="cat-filter">
+        <option value="">All Categories</option>
+        <option value="Lab">Lab</option>
+        <option value="Lecture Hall">Lecture Hall</option>
+        <option value="Seminar Room">Seminar Room</option>
+        <option value="Equipment">Equipment</option>
+      </select>
+      <a href="booking.html" class="btn btn-primary btn-sm" style="margin-left:auto;">+ New Booking</a>
+    </div>
+
+    <!-- BOOKINGS TABLE -->
+    <div class="card">
+      <div id="booking-count" style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px;"></div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Resource</th>
+              <th>Category</th>
+              <th>Purpose</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="bookings-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Cancel Confirmation Modal -->
+  <div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;padding:32px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <h3 style="margin-bottom:10px;color:var(--text);">Cancel Booking?</h3>
+      <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:24px;">
+        Are you sure you want to cancel this reservation? This action cannot be undone.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <button class="btn btn-outline" id="modal-cancel-btn">Keep It</button>
+        <button class="btn btn-red"     id="modal-confirm-btn">Yes, Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    (async () => {
+      const user = Session.require();
+      if (!user) return;
+      initNavbar(user);
+
+      const [resources, bookings] = await Promise.all([
+        API.get('/resources'),
+        API.get('/bookings/my'),
+      ]);
+      setResourceCache(resources);
+      let allBookings = bookings;
+
+      let pendingCancelId = null;
+
+      function renderBookings() {
+        const search = document.getElementById('search').value.toLowerCase();
+        const status = document.getElementById('status-filter').value;
+        const cat    = document.getElementById('cat-filter').value;
+
+        const filtered = allBookings.filter(b => {
+          const res = resourceById(b.resourceId);
+          return (
+            (!search || res.name?.toLowerCase().includes(search) || b.purpose?.toLowerCase().includes(search)) &&
+            (!status || b.status === status) &&
+            (!cat    || res.category === cat)
+          );
+        });
+
+        document.getElementById('booking-count').textContent =
+          `Showing ${filtered.length} booking${filtered.length !== 1 ? 's' : ''}`;
+
+        const tbody = document.getElementById('bookings-body');
+        if (filtered.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8">
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <h3>No bookings found</h3>
+              <p>Try adjusting your filters or <a href="booking.html">make a new booking</a>.</p>
+            </div>
+          </td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(b => {
+          const res = resourceById(b.resourceId);
+          const canCancel = b.status === 'Confirmed' && new Date(b.startTime) > new Date();
+          return `<tr>
+            <td style="color:var(--text-muted);font-size:.82rem;">#${b.id}</td>
+            <td><strong>${res.icon || '📦'} ${res.name || 'Unknown'}</strong></td>
+            <td><span class="badge badge-blue">${res.category || '—'}</span></td>
+            <td style="max-width:180px;font-size:.85rem;color:var(--text-muted);">${b.purpose || '—'}</td>
+            <td style="font-size:.85rem;">${fmt(b.startTime)}</td>
+            <td style="font-size:.85rem;">${fmt(b.endTime)}</td>
+            <td>${statusBadge(b.status)}</td>
+            <td>
+              ${canCancel
+                ? `<button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;"
+                     onclick="openCancelModal(${b.id})">Cancel</button>`
+                : `<span style="color:var(--text-muted);font-size:.82rem;">—</span>`}
+            </td>
+          </tr>`;
+        }).join('');
+      }
+
+      window.openCancelModal = function (id) {
+        pendingCancelId = id;
+        document.getElementById('modal-overlay').style.display = 'flex';
+      };
+
+      document.getElementById('modal-cancel-btn').addEventListener('click', () => {
+        document.getElementById('modal-overlay').style.display = 'none';
+        pendingCancelId = null;
+      });
+
+      document.getElementById('modal-confirm-btn').addEventListener('click', async () => {
+        if (pendingCancelId === null) return;
+        try {
+          await API.patch(`/bookings/${pendingCancelId}/cancel`);
+          const bk = allBookings.find(b => b.id === pendingCancelId);
+          if (bk) bk.status = 'Cancelled';
+          document.getElementById('modal-overlay').style.display = 'none';
+          pendingCancelId = null;
+          showToast('Booking cancelled.', 'error');
+          renderBookings();
+        } catch (err) {
+          showToast(err.error || 'Failed to cancel booking.', 'error');
+        }
+      });
+
+      document.getElementById('modal-overlay').addEventListener('click', function (e) {
+        if (e.target === this) { this.style.display = 'none'; pendingCancelId = null; }
+      });
+
+      document.getElementById('search').addEventListener('input', renderBookings);
+      document.getElementById('status-filter').addEventListener('change', renderBookings);
+      document.getElementById('cat-filter').addEventListener('change', renderBookings);
+
+      renderBookings();
+    })();
+  </script>
+</body>
+</html>

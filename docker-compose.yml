@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: campus-booking-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: CampusBookingDB
+      MYSQL_USER: app_service
+      MYSQL_PASSWORD: AppService2025!
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./app/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: node:20-alpine
+    container_name: campus-booking-app
+    restart: unless-stopped
+    working_dir: /app/backend
+    volumes:
+      - ./app:/app
+      - /app/backend/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: CampusBookingDB
+      DB_USER: app_service
+      DB_PASSWORD: AppService2025!
+      DB_SSL: "false"
+      SESSION_SECRET: local-dev-secret-change-in-prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npm install && node app.js"
+
+volumes:
+  db-data:

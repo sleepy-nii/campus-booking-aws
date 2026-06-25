@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resources — Campus Resource Booking</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="brand-dot"></span>
+      MMU Resource Booking
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html">Dashboard</a></li>
+      <li><a href="resources.html" class="active">Resources</a></li>
+      <li><a href="booking.html">New Booking</a></li>
+      <li><a href="my-bookings.html">My Bookings</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="avatar"></div>
+      <span class="nav-username"></span>
+      <button class="btn-logout">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <div class="page-header">
+      <h1>Campus Resources</h1>
+      <p>Browse all available labs, lecture halls, seminar rooms and equipment.</p>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <input type="text" id="search" placeholder="🔍 Search resource name…" />
+      <select id="cat-filter">
+        <option value="">All Categories</option>
+        <option value="Lab">Lab</option>
+        <option value="Lecture Hall">Lecture Hall</option>
+        <option value="Seminar Room">Seminar Room</option>
+        <option value="Equipment">Equipment</option>
+      </select>
+      <select id="status-filter">
+        <option value="">All Status</option>
+        <option value="Active">Active</option>
+        <option value="Maintenance">Maintenance</option>
+      </select>
+    </div>
+
+    <div id="resource-count" style="font-size:.88rem;color:var(--text-muted);margin-bottom:16px;"></div>
+
+    <div class="resource-grid" id="resource-grid"></div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    (async () => {
+      const user = Session.require();
+      if (!user) return;
+      initNavbar(user);
+
+      const resources = await API.get('/resources');
+      setResourceCache(resources);
+      let allResources = resources;
+
+      function renderResources() {
+        const search = document.getElementById('search').value.toLowerCase();
+        const cat    = document.getElementById('cat-filter').value;
+        const status = document.getElementById('status-filter').value;
+
+        const filtered = allResources.filter(r =>
+          (!search || r.name.toLowerCase().includes(search)) &&
+          (!cat    || r.category === cat) &&
+          (!status || r.status === status)
+        );
+
+        document.getElementById('resource-count').textContent =
+          `Showing ${filtered.length} of ${allResources.length} resources`;
+
+        const grid = document.getElementById('resource-grid');
+        if (filtered.length === 0) {
+          grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-icon">🔍</div>
+            <h3>No resources found</h3>
+            <p>Try adjusting your filters.</p>
+          </div>`;
+          return;
+        }
+
+        grid.innerHTML = filtered.map(r => {
+          const isActive = r.status === 'Active';
+          return `
+          <div class="resource-card">
+            <div class="resource-card-header" style="${!isActive ? 'background:linear-gradient(135deg,#6b7280,#9ca3af)' : ''}">
+              <div class="res-icon">${r.icon}</div>
+              <h3>${r.name}</h3>
+              <div class="category">${r.category}</div>
+            </div>
+            <div class="resource-card-body">
+              <div class="res-meta">
+                <div class="res-meta-item">👥 Capacity: <strong>${r.capacity}</strong></div>
+                <div class="res-meta-item">
+                  <span class="badge ${isActive ? 'badge-success' : 'badge-warning'}">${r.status}</span>
+                </div>
+              </div>
+              ${isActive
+                ? `<a href="booking.html?resource=${r.id}" class="btn btn-primary btn-sm btn-full">📅 Book Now</a>`
+                : `<button class="btn btn-sm btn-full" style="background:#e5e7eb;color:#6b7280;cursor:not-allowed;" disabled>🔧 Under Maintenance</button>`
+              }
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      document.getElementById('search').addEventListener('input', renderResources);
+      document.getElementById('cat-filter').addEventListener('change', renderResources);
+      document.getElementById('status-filter').addEventListener('change', renderResources);
+
+      renderResources();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — Campus Resource Booking</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ── Tab System ── */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px;
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+    .tab-btn {
+      padding: 9px 22px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      font-size: .92rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .tab-btn.active {
+      background: var(--mmu-blue);
+      color: #fff;
+    }
+    .tab-btn:not(.active):hover { background: var(--bg); color: var(--text); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* Tab nav — no active highlight, hover only */
+    .navbar-nav a.tab-nav.active {
+      background: transparent;
+      color: rgba(255,255,255,.85);
+    }
+
+    /* ── Admin stat cards ── */
+    .admin-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 14px;
+      padding: 32px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.3);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-box h3 {
+      font-size: 1.1rem;
+      color: var(--mmu-blue);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* ── Confirm modal ── */
+    .confirm-body { color: var(--text-muted); font-size: .9rem; line-height: 1.6; margin-bottom: 20px; }
+
+    /* ── Inline action buttons ── */
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-icon {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: .8rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-icon:hover { opacity: .8; }
+    .btn-edit   { background: #dbeafe; color: #1e40af; }
+    .btn-toggle { background: #fef3c7; color: #92400e; }
+    .btn-delete { background: #fee2e2; color: #991b1b; }
+    .btn-cancel-bk { background: #fee2e2; color: #991b1b; }
+
+    /* ── Icon picker ── */
+    .icon-grid {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+    }
+    .icon-opt {
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .icon-opt.selected { border-color: var(--mmu-blue); background: #eff6ff; }
+
+    /* ── History user pill ── */
+    .user-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #f1f5f9; border-radius: 20px;
+      padding: 3px 10px; font-size: .8rem; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <span class="brand-dot"></span>
+      MMU Resource Booking
+    </a>
+    <ul class="navbar-nav" id="admin-nav">
+      <li><a href="#" class="tab-nav active" data-tab="overview">📊 Overview</a></li>
+      <li><a href="#" class="tab-nav" data-tab="bookings">📅 Booking History</a></li>
+      <li><a href="#" class="tab-nav" data-tab="resources">🗂️ Resource Management</a></li>
+      <li><a href="#" class="tab-nav" data-tab="users">👥 User Management</a></li>
+    </ul>
+    <div class="navbar-user">
+      <div class="avatar"></div>
+      <span class="nav-username"></span>
+      <button class="btn-logout">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+
+    <div class="page-header">
+      <h1>⚙️ Admin Panel</h1>
+      <p>Manage bookings, resources, and monitor system activity.</p>
+    </div>
+
+    <!-- ══════════════════ TAB: OVERVIEW ══════════════════ -->
+    <div class="tab-pane active" id="tab-overview">
+
+      <div class="admin-stats" id="overview-stats"></div>
+
+      <!-- Booking Status Breakdown -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="section-title">Booking Status Breakdown</div>
+        <div id="status-breakdown" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Status</th><th>Count</th><th>% of Total</th></tr>
+            </thead>
+            <tbody id="status-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="card">
+        <div class="section-title">
+          Recent Booking Activity
+          <button class="btn btn-outline btn-sm" onclick="switchTab('bookings')">View All</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>User</th><th>Resource</th><th>Start</th><th>End</th><th>Status</th></tr>
+            </thead>
+            <tbody id="recent-activity"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ TAB: BOOKING HISTORY ══════════════════ -->
+    <div class="tab-pane" id="tab-bookings">
+
+      <div class="filter-bar" style="margin-bottom:20px;">
+        <input type="text" id="bk-search" placeholder="🔍 Search user, resource or purpose…" />
+        <select id="bk-status">
+          <option value="">All Status</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+        <select id="bk-user">
+          <option value="">All Users</option>
+        </select>
+        <select id="bk-cat">
+          <option value="">All Categories</option>
+          <option value="Lab">Lab</option>
+          <option value="Lecture Hall">Lecture Hall</option>
+          <option value="Seminar Room">Seminar Room</option>
+          <option value="Equipment">Equipment</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <div id="bk-count" style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Resource</th>
+                <th>Category</th>
+                <th>Purpose</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="bk-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ TAB: RESOURCE MANAGEMENT ══════════════════ -->
+    <div class="tab-pane" id="tab-resources">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div class="filter-bar" style="margin:0;">
+          <input type="text" id="res-search" placeholder="🔍 Search resource…" />
+          <select id="res-cat-filter">
+            <option value="">All Categories</option>
+            <option value="Lab">Lab</option>
+            <option value="Lecture Hall">Lecture Hall</option>
+            <option value="Seminar Room">Seminar Room</option>
+            <option value="Equipment">Equipment</option>
+          </select>
+          <select id="res-status-filter">
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Resource</button>
+      </div>
+
+      <div class="card">
+        <div id="res-count" style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Icon</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Capacity</th>
+                <th>Status</th>
+                <th>Active Bookings</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="res-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ TAB: USER MANAGEMENT ══════════════════ -->
+    <div class="tab-pane" id="tab-users">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div class="filter-bar" style="margin:0;">
+          <input type="text" id="usr-search" placeholder="🔍 Search name or email…" />
+          <select id="usr-role-filter">
+            <option value="">All Roles</option>
+            <option value="Faculty">Faculty</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+      </div>
+
+      <div class="card">
+        <div id="usr-count" style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;"></div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Total Bookings</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usr-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /page-wrapper -->
+
+  <!-- ══ MODAL: Add / Edit User ══ -->
+  <div class="modal-overlay" id="user-modal">
+    <div class="modal-box">
+      <h3 id="user-modal-title">Add New User</h3>
+      <form id="user-form" novalidate>
+        <input type="hidden" id="usr-edit-id" />
+
+        <div class="form-group">
+          <label for="usr-fullname">Full Name <span style="color:var(--mmu-red)">*</span></label>
+          <input type="text" id="usr-fullname" placeholder="e.g. Dr. Ahmad Razif" required />
+        </div>
+
+        <div class="form-group">
+          <label for="usr-email">MMU Email <span style="color:var(--mmu-red)">*</span></label>
+          <input type="email" id="usr-email" placeholder="e.g. name@mmu.edu.my" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="usr-role">Role <span style="color:var(--mmu-red)">*</span></label>
+            <select id="usr-role" required>
+              <option value="Faculty">Faculty</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="usr-password">Password <span style="color:var(--mmu-red)" id="pwd-required">*</span></label>
+            <input type="password" id="usr-password" placeholder="Enter password" />
+            <div class="form-hint" id="pwd-hint"></div>
+          </div>
+        </div>
+
+        <div id="user-modal-error" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:12px;"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeUserModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="user-modal-submit">Add User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Confirm Delete User ══ -->
+  <div class="modal-overlay" id="delete-user-modal">
+    <div class="modal-box" style="max-width:380px;">
+      <h3 style="color:var(--danger);">🗑️ Delete User?</h3>
+      <p class="confirm-body" id="delete-user-msg"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeDeleteUserModal()">Cancel</button>
+        <button class="btn btn-red" id="delete-user-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Add / Edit Resource ══ -->
+  <div class="modal-overlay" id="resource-modal">
+    <div class="modal-box">
+      <h3 id="modal-title">Add New Resource</h3>
+      <form id="resource-form" novalidate>
+        <input type="hidden" id="edit-id" />
+
+        <div class="form-group">
+          <label>Icon</label>
+          <div class="icon-grid" id="icon-grid"></div>
+          <input type="hidden" id="res-icon" value="📦" />
+        </div>
+
+        <div class="form-group">
+          <label for="res-name">Resource Name <span style="color:var(--mmu-red)">*</span></label>
+          <input type="text" id="res-name" placeholder="e.g. Computer Lab C" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="res-category">Category <span style="color:var(--mmu-red)">*</span></label>
+            <select id="res-category" required>
+              <option value="">— Select —</option>
+              <option value="Lab">Lab</option>
+              <option value="Lecture Hall">Lecture Hall</option>
+              <option value="Seminar Room">Seminar Room</option>
+              <option value="Equipment">Equipment</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="res-capacity">Capacity <span style="color:var(--mmu-red)">*</span></label>
+            <input type="number" id="res-capacity" placeholder="e.g. 40" min="1" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="res-status-input">Status</label>
+          <select id="res-status-input">
+            <option value="Active">Active</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+
+        <div id="modal-error" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:12px;"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeResourceModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-submit-btn">Add Resource</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Confirm Delete ══ -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal-box" style="max-width:380px;">
+      <h3 style="color:var(--danger);">🗑️ Delete Resource?</h3>
+      <p class="confirm-body" id="delete-msg"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-red" id="delete-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Confirm Cancel Booking ══ -->
+  <div class="modal-overlay" id="cancel-bk-modal">
+    <div class="modal-box" style="max-width:380px;">
+      <h3 style="color:var(--danger);">Cancel Booking?</h3>
+      <p class="confirm-body">This will cancel the booking and cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeCancelModal()">Keep It</button>
+        <button class="btn btn-red" id="cancel-bk-confirm-btn">Yes, Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    (async () => {
+      const user = Session.require();
+      if (!user || user.role !== 'Admin') {
+        alert('Access denied. Admins only.');
+        window.location.href = 'dashboard.html';
+        return;
+      }
+      initNavbar(user);
+
+      // ── Load all data ──────────────────────────────────────
+      let cachedUsers, cachedResources, cachedBookings;
+
+      async function loadAll() {
+        [cachedUsers, cachedResources, cachedBookings] = await Promise.all([
+          API.get('/users'),
+          API.get('/resources'),
+          API.get('/bookings'),
+        ]);
+        setResourceCache(cachedResources);
+        setUserCache(cachedUsers);
+      }
+
+      await loadAll();
+
+      // ── Tab switching ──────────────────────────────────────
+      window.switchTab = function (name) {
+        document.querySelectorAll('.tab-nav').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+        if (name === 'overview')  renderOverview();
+        if (name === 'bookings')  renderBookings();
+        if (name === 'resources') renderResources();
+        if (name === 'users')     renderUsers();
+      };
+
+      document.querySelectorAll('.tab-nav').forEach(a => {
+        a.addEventListener('click', e => { e.preventDefault(); switchTab(a.dataset.tab); });
+      });
+
+      // ═══════════ OVERVIEW ═══════════════════════════════════
+      function renderOverview() {
+        const bookings  = cachedBookings;
+        const resources = cachedResources;
+        const confirmed = bookings.filter(b => b.status === 'Confirmed').length;
+        const cancelled = bookings.filter(b => b.status === 'Cancelled').length;
+        const activeRes = resources.filter(r => r.status === 'Active').length;
+        const maintRes  = resources.filter(r => r.status === 'Maintenance').length;
+
+        document.getElementById('overview-stats').innerHTML = `
+          <div class="stat-card"><div class="stat-icon blue">📅</div>
+            <div class="stat-info"><div class="value">${bookings.length}</div><div class="label">Total Bookings</div></div></div>
+          <div class="stat-card"><div class="stat-icon green">✅</div>
+            <div class="stat-info"><div class="value">${confirmed}</div><div class="label">Confirmed</div></div></div>
+          <div class="stat-card"><div class="stat-icon red">❌</div>
+            <div class="stat-info"><div class="value">${cancelled}</div><div class="label">Cancelled</div></div></div>
+          <div class="stat-card"><div class="stat-icon blue">🖥️</div>
+            <div class="stat-info"><div class="value">${resources.length}</div><div class="label">Total Resources</div></div></div>
+          <div class="stat-card"><div class="stat-icon green">🟢</div>
+            <div class="stat-info"><div class="value">${activeRes}</div><div class="label">Active Resources</div></div></div>
+          <div class="stat-card"><div class="stat-icon amber">🔧</div>
+            <div class="stat-info"><div class="value">${maintRes}</div><div class="label">Under Maintenance</div></div></div>
+        `;
+
+        const total    = bookings.length || 1;
+        const statuses = ['Confirmed', 'Cancelled'];
+        const colors   = { Confirmed: '#16a34a', Cancelled: '#dc2626' };
+
+        document.getElementById('status-breakdown').innerHTML = statuses.map(s => {
+          const n   = bookings.filter(b => b.status === s).length;
+          const pct = Math.round((n / total) * 100);
+          return `<div style="flex:1;min-width:140px;background:#f8fafc;border-radius:10px;padding:16px 18px;border:1px solid var(--border);">
+            <div style="font-size:1.6rem;font-weight:700;color:${colors[s]}">${n}</div>
+            <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px;">${s}</div>
+            <div style="margin-top:8px;height:6px;background:#e5e7eb;border-radius:3px;">
+              <div style="height:100%;width:${pct}%;background:${colors[s]};border-radius:3px;"></div>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px;">${pct}%</div>
+          </div>`;
+        }).join('');
+
+        document.getElementById('status-table').innerHTML = statuses.map(s => {
+          const n = bookings.filter(b => b.status === s).length;
+          return `<tr>
+            <td>${statusBadge(s)}</td>
+            <td><strong>${n}</strong></td>
+            <td>${Math.round((n / total) * 100)}%</td>
+          </tr>`;
+        }).join('');
+
+        const recent = [...bookings].reverse().slice(0, 8);
+        document.getElementById('recent-activity').innerHTML = recent.length
+          ? recent.map(b => {
+              const res = resourceById(b.resourceId);
+              const u   = userById(b.userId);
+              return `<tr>
+                <td><span class="user-pill">👤 ${u.fullName}</span></td>
+                <td>${res.icon || '📦'} ${res.name || 'Unknown'}</td>
+                <td style="font-size:.83rem;">${fmt(b.startTime)}</td>
+                <td style="font-size:.83rem;">${fmt(b.endTime)}</td>
+                <td>${statusBadge(b.status)}</td>
+              </tr>`;
+            }).join('')
+          : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">No bookings yet.</td></tr>`;
+      }
+
+      // ═══════════ BOOKING HISTORY ════════════════════════════
+      function populateUserFilter() {
+        const sel = document.getElementById('bk-user');
+        if (sel.children.length > 1) return;
+        cachedUsers.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = u.fullName;
+          sel.appendChild(opt);
+        });
+      }
+
+      let pendingCancelId = null;
+
+      function renderBookings() {
+        populateUserFilter();
+        const search = document.getElementById('bk-search').value.toLowerCase();
+        const status = document.getElementById('bk-status').value;
+        const uid    = document.getElementById('bk-user').value;
+        const cat    = document.getElementById('bk-cat').value;
+
+        const all      = [...cachedBookings].reverse();
+        const filtered = all.filter(b => {
+          const res = resourceById(b.resourceId);
+          const u   = userById(b.userId);
+          return (
+            (!search || u.fullName.toLowerCase().includes(search) ||
+                        res.name?.toLowerCase().includes(search) ||
+                        b.purpose?.toLowerCase().includes(search)) &&
+            (!status || b.status === status) &&
+            (!uid    || b.userId === Number(uid)) &&
+            (!cat    || res.category === cat)
+          );
+        });
+
+        document.getElementById('bk-count').textContent =
+          `Showing ${filtered.length} of ${cachedBookings.length} bookings`;
+
+        const tbody = document.getElementById('bk-body');
+        if (!filtered.length) {
+          tbody.innerHTML = `<tr><td colspan="10">
+            <div class="empty-state"><div class="empty-icon">📭</div>
+            <h3>No bookings found</h3><p>Try adjusting the filters.</p></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(b => {
+          const res       = resourceById(b.resourceId);
+          const u         = userById(b.userId);
+          const canCancel = b.status === 'Confirmed' && new Date(b.startTime) > new Date();
+          return `<tr>
+            <td style="color:var(--text-muted);font-size:.8rem;">#${b.id}</td>
+            <td><span class="user-pill">👤 ${u.fullName}</span></td>
+            <td><span class="badge ${u.role==='Admin'?'badge-danger':'badge-blue'}">${u.role}</span></td>
+            <td><strong>${res.icon||'📦'} ${res.name||'Unknown'}</strong></td>
+            <td><span class="badge badge-blue">${res.category||'—'}</span></td>
+            <td style="max-width:150px;font-size:.82rem;color:var(--text-muted);">${b.purpose||'—'}</td>
+            <td style="font-size:.82rem;">${fmt(b.startTime)}</td>
+            <td style="font-size:.82rem;">${fmt(b.endTime)}</td>
+            <td>${statusBadge(b.status)}</td>
+            <td>
+              ${canCancel
+                ? `<button class="btn-icon btn-cancel-bk" onclick="openCancelModal(${b.id})">Cancel</button>`
+                : `<span style="color:var(--text-muted);font-size:.8rem;">—</span>`}
+            </td>
+          </tr>`;
+        }).join('');
+      }
+
+      window.openCancelModal = function (id) {
+        pendingCancelId = id;
+        document.getElementById('cancel-bk-modal').classList.add('open');
+      };
+      window.closeCancelModal = function () {
+        pendingCancelId = null;
+        document.getElementById('cancel-bk-modal').classList.remove('open');
+      };
+
+      document.getElementById('cancel-bk-confirm-btn').addEventListener('click', async () => {
+        if (pendingCancelId === null) return;
+        try {
+          await API.patch(`/bookings/${pendingCancelId}/cancel`);
+          const bk = cachedBookings.find(b => b.id === pendingCancelId);
+          if (bk) bk.status = 'Cancelled';
+          closeCancelModal();
+          showToast('Booking cancelled.', 'error');
+          renderBookings();
+          renderOverview();
+        } catch (err) {
+          showToast(err.error || 'Failed to cancel booking.', 'error');
+        }
+      });
+
+      ['bk-search','bk-status','bk-user','bk-cat'].forEach(id =>
+        document.getElementById(id).addEventListener(id === 'bk-search' ? 'input' : 'change', renderBookings)
+      );
+
+      // ═══════════ RESOURCE MANAGEMENT ════════════════════════
+      const ICONS = ['🖥️','🎓','📋','📽️','📹','🌐','🔬','📚','🖨️','💡','🎙️','📦','🏫','🔧','🖱️'];
+      let pendingDeleteId = null;
+
+      function buildIconGrid(selected) {
+        document.getElementById('icon-grid').innerHTML = ICONS.map(ic =>
+          `<div class="icon-opt${ic===selected?' selected':''}" data-icon="${ic}" onclick="selectIcon(this)">${ic}</div>`
+        ).join('');
+        document.getElementById('res-icon').value = selected;
+      }
+
+      window.selectIcon = function (el) {
+        document.querySelectorAll('.icon-opt').forEach(e => e.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('res-icon').value = el.dataset.icon;
+      };
+
+      function renderResources() {
+        const search = document.getElementById('res-search').value.toLowerCase();
+        const cat    = document.getElementById('res-cat-filter').value;
+        const status = document.getElementById('res-status-filter').value;
+
+        const filtered = cachedResources.filter(r =>
+          (!search || r.name.toLowerCase().includes(search)) &&
+          (!cat    || r.category === cat) &&
+          (!status || r.status === status)
+        );
+
+        document.getElementById('res-count').textContent =
+          `Showing ${filtered.length} of ${cachedResources.length} resources`;
+
+        const tbody = document.getElementById('res-body');
+        if (!filtered.length) {
+          tbody.innerHTML = `<tr><td colspan="7">
+            <div class="empty-state"><div class="empty-icon">🔍</div>
+            <h3>No resources found</h3><p>Adjust filters or add a new resource.</p></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(r => {
+          const activeBookings = cachedBookings.filter(
+            b => b.resourceId === r.id && b.status === 'Confirmed' && new Date(b.endTime) > new Date()
+          ).length;
+          return `<tr>
+            <td style="font-size:1.4rem;text-align:center;">${r.icon}</td>
+            <td><strong>${r.name}</strong></td>
+            <td><span class="badge badge-blue">${r.category}</span></td>
+            <td>👥 ${r.capacity}</td>
+            <td><span class="badge ${r.status==='Active'?'badge-success':'badge-warning'}">${r.status}</span></td>
+            <td style="text-align:center;">
+              ${activeBookings > 0
+                ? `<span class="badge badge-blue">${activeBookings} active</span>`
+                : `<span style="color:var(--text-muted);font-size:.82rem;">None</span>`}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="btn-icon btn-edit"   onclick="openEditModal(${r.id})">✏️ Edit</button>
+                <button class="btn-icon btn-toggle" onclick="toggleStatus(${r.id})">
+                  ${r.status==='Active' ? '🔧 Set Maintenance' : '✅ Set Active'}
+                </button>
+                <button class="btn-icon btn-delete" onclick="openDeleteModal(${r.id},'${r.name.replace(/'/g,"\\'")}')">🗑️ Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      }
+
+      window.toggleStatus = async function (id) {
+        try {
+          await API.patch(`/resources/${id}/toggle-status`);
+          cachedResources = await API.get('/resources');
+          setResourceCache(cachedResources);
+          renderResources();
+          renderOverview();
+          showToast('Resource status updated.', 'success');
+        } catch (err) {
+          showToast(err.error || 'Failed to update status.', 'error');
+        }
+      };
+
+      window.openAddModal = function () {
+        document.getElementById('modal-title').textContent     = 'Add New Resource';
+        document.getElementById('modal-submit-btn').textContent = 'Add Resource';
+        document.getElementById('edit-id').value               = '';
+        document.getElementById('res-name').value              = '';
+        document.getElementById('res-category').value          = '';
+        document.getElementById('res-capacity').value          = '';
+        document.getElementById('res-status-input').value      = 'Active';
+        document.getElementById('modal-error').style.display   = 'none';
+        buildIconGrid('📦');
+        document.getElementById('resource-modal').classList.add('open');
+      };
+
+      window.openEditModal = function (id) {
+        const r = cachedResources.find(r => r.id === id);
+        if (!r) return;
+        document.getElementById('modal-title').textContent     = 'Edit Resource';
+        document.getElementById('modal-submit-btn').textContent = 'Save Changes';
+        document.getElementById('edit-id').value               = r.id;
+        document.getElementById('res-name').value              = r.name;
+        document.getElementById('res-category').value          = r.category;
+        document.getElementById('res-capacity').value          = r.capacity;
+        document.getElementById('res-status-input').value      = r.status;
+        document.getElementById('modal-error').style.display   = 'none';
+        buildIconGrid(r.icon || '📦');
+        document.getElementById('resource-modal').classList.add('open');
+      };
+
+      window.closeResourceModal = function () {
+        document.getElementById('resource-modal').classList.remove('open');
+      };
+
+      document.getElementById('resource-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const errEl    = document.getElementById('modal-error');
+        const name     = document.getElementById('res-name').value.trim();
+        const category = document.getElementById('res-category').value;
+        const capacity = parseInt(document.getElementById('res-capacity').value);
+        const status   = document.getElementById('res-status-input').value;
+        const icon     = document.getElementById('res-icon').value;
+        const editId   = document.getElementById('edit-id').value;
+
+        if (!name || !category || !capacity) {
+          errEl.textContent = 'Please fill in all required fields.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        try {
+          if (editId) {
+            await API.put(`/resources/${editId}`, { name, category, capacity, status, icon });
+            showToast('Resource updated successfully.', 'success');
+          } else {
+            await API.post('/resources', { name, category, capacity, status, icon });
+            showToast('Resource added successfully.', 'success');
+          }
+          cachedResources = await API.get('/resources');
+          setResourceCache(cachedResources);
+          closeResourceModal();
+          renderResources();
+          renderOverview();
+        } catch (err) {
+          errEl.textContent = err.error || 'Failed to save resource.';
+          errEl.style.display = 'block';
+        }
+      });
+
+      window.openDeleteModal = function (id, name) {
+        pendingDeleteId = id;
+        document.getElementById('delete-msg').textContent =
+          `Are you sure you want to delete "${name}"? Any associated bookings may be affected.`;
+        document.getElementById('delete-modal').classList.add('open');
+      };
+
+      window.closeDeleteModal = function () {
+        pendingDeleteId = null;
+        document.getElementById('delete-modal').classList.remove('open');
+      };
+
+      document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+        if (pendingDeleteId === null) return;
+        try {
+          await API.delete(`/resources/${pendingDeleteId}`);
+          cachedResources = await API.get('/resources');
+          setResourceCache(cachedResources);
+          closeDeleteModal();
+          renderResources();
+          renderOverview();
+          showToast('Resource deleted.', 'error');
+        } catch (err) {
+          showToast(err.error || 'Failed to delete resource.', 'error');
+        }
+      });
+
+      ['resource-modal','delete-modal','cancel-bk-modal'].forEach(id => {
+        document.getElementById(id).addEventListener('click', function (e) {
+          if (e.target === this) {
+            this.classList.remove('open');
+            pendingDeleteId  = null;
+            pendingCancelId  = null;
+          }
+        });
+      });
+
+      ['res-search','res-cat-filter','res-status-filter'].forEach(id =>
+        document.getElementById(id).addEventListener(id === 'res-search' ? 'input' : 'change', renderResources)
+      );
+
+      // ═══════════ USER MANAGEMENT ════════════════════════════
+      let pendingDeleteUserId = null;
+
+      function renderUsers() {
+        const search = document.getElementById('usr-search').value.toLowerCase();
+        const role   = document.getElementById('usr-role-filter').value;
+
+        const filtered = cachedUsers.filter(u =>
+          (!search || u.fullName.toLowerCase().includes(search) || u.email.toLowerCase().includes(search)) &&
+          (!role   || u.role === role)
+        );
+
+        document.getElementById('usr-count').textContent =
+          `Showing ${filtered.length} of ${cachedUsers.length} users`;
+
+        const tbody = document.getElementById('usr-body');
+        if (!filtered.length) {
+          tbody.innerHTML = `<tr><td colspan="6">
+            <div class="empty-state"><div class="empty-icon">👤</div>
+            <h3>No users found</h3><p>Try adjusting the filters or add a new user.</p></div>
+          </td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map(u => {
+          const bookingCount = cachedBookings.filter(b => b.userId === u.id).length;
+          const isSelf       = u.id === user.id;
+          return `<tr>
+            <td style="color:var(--text-muted);font-size:.8rem;">#${u.id}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="avatar" style="width:32px;height:32px;font-size:.75rem;flex-shrink:0;">
+                  ${u.fullName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                </div>
+                <strong>${u.fullName}</strong>
+                ${isSelf ? '<span class="badge badge-blue" style="font-size:.7rem;">You</span>' : ''}
+              </div>
+            </td>
+            <td style="font-size:.87rem;color:var(--text-muted);">${u.email}</td>
+            <td><span class="badge ${u.role==='Admin'?'badge-danger':'badge-blue'}">${u.role}</span></td>
+            <td style="text-align:center;">
+              ${bookingCount > 0
+                ? `<span class="badge badge-blue">${bookingCount}</span>`
+                : `<span style="color:var(--text-muted);font-size:.82rem;">0</span>`}
+            </td>
+            <td>
+              <div class="action-btns">
+                <button class="btn-icon btn-edit" onclick="openEditUserModal(${u.id})">✏️ Edit</button>
+                ${!isSelf
+                  ? `<button class="btn-icon btn-delete" onclick="openDeleteUserModal(${u.id},'${u.fullName.replace(/'/g,"\\'")}')">🗑️ Delete</button>`
+                  : `<span style="font-size:.78rem;color:var(--text-muted);">—</span>`}
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      }
+
+      window.openAddUserModal = function () {
+        document.getElementById('user-modal-title').textContent  = 'Add New User';
+        document.getElementById('user-modal-submit').textContent = 'Add User';
+        document.getElementById('usr-edit-id').value             = '';
+        document.getElementById('usr-fullname').value            = '';
+        document.getElementById('usr-email').value               = '';
+        document.getElementById('usr-password').value            = '';
+        document.getElementById('usr-role').value                = 'Faculty';
+        document.getElementById('pwd-hint').textContent          = '';
+        document.getElementById('pwd-required').style.display    = 'inline';
+        document.getElementById('user-modal-error').style.display = 'none';
+        document.getElementById('user-modal').classList.add('open');
+      };
+
+      window.openEditUserModal = function (id) {
+        const u = cachedUsers.find(u => u.id === id);
+        if (!u) return;
+        document.getElementById('user-modal-title').textContent  = 'Edit User';
+        document.getElementById('user-modal-submit').textContent = 'Save Changes';
+        document.getElementById('usr-edit-id').value             = u.id;
+        document.getElementById('usr-fullname').value            = u.fullName;
+        document.getElementById('usr-email').value               = u.email;
+        document.getElementById('usr-password').value            = '';
+        document.getElementById('usr-role').value                = u.role;
+        document.getElementById('pwd-hint').textContent          = 'Leave blank to keep current password.';
+        document.getElementById('pwd-required').style.display    = 'none';
+        document.getElementById('user-modal-error').style.display = 'none';
+        document.getElementById('user-modal').classList.add('open');
+      };
+
+      window.closeUserModal = function () {
+        document.getElementById('user-modal').classList.remove('open');
+      };
+
+      document.getElementById('user-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const errEl    = document.getElementById('user-modal-error');
+        const editId   = document.getElementById('usr-edit-id').value;
+        const fullName = document.getElementById('usr-fullname').value.trim();
+        const email    = document.getElementById('usr-email').value.trim().toLowerCase();
+        const password = document.getElementById('usr-password').value;
+        const role     = document.getElementById('usr-role').value;
+
+        errEl.style.display = 'none';
+
+        if (!fullName || !email || !role) {
+          errEl.textContent = 'Please fill in all required fields.';
+          errEl.style.display = 'block'; return;
+        }
+        if (!editId && !password) {
+          errEl.textContent = 'Password is required for new users.';
+          errEl.style.display = 'block'; return;
+        }
+
+        try {
+          if (editId) {
+            const updates = { fullName, email, role };
+            if (password) updates.password = password;
+            await API.put(`/users/${editId}`, updates);
+            showToast('User updated successfully.', 'success');
+          } else {
+            await API.post('/users', { fullName, email, password, role });
+            showToast('User added successfully.', 'success');
+          }
+          cachedUsers = await API.get('/users');
+          setUserCache(cachedUsers);
+          closeUserModal();
+          renderUsers();
+          renderOverview();
+        } catch (err) {
+          errEl.textContent = err.error || 'Failed to save user.';
+          errEl.style.display = 'block';
+        }
+      });
+
+      window.openDeleteUserModal = function (id, name) {
+        pendingDeleteUserId = id;
+        document.getElementById('delete-user-msg').textContent =
+          `Are you sure you want to delete "${name}"? All their bookings will remain but be unlinked.`;
+        document.getElementById('delete-user-modal').classList.add('open');
+      };
+
+      window.closeDeleteUserModal = function () {
+        pendingDeleteUserId = null;
+        document.getElementById('delete-user-modal').classList.remove('open');
+      };
+
+      document.getElementById('delete-user-confirm-btn').addEventListener('click', async () => {
+        if (pendingDeleteUserId === null) return;
+        try {
+          await API.delete(`/users/${pendingDeleteUserId}`);
+          cachedUsers = await API.get('/users');
+          setUserCache(cachedUsers);
+          closeDeleteUserModal();
+          renderUsers();
+          renderOverview();
+          showToast('User deleted.', 'error');
+        } catch (err) {
+          showToast(err.error || 'Failed to delete user.', 'error');
+        }
+      });
+
+      ['usr-search','usr-role-filter'].forEach(id =>
+        document.getElementById(id).addEventListener(id === 'usr-search' ? 'input' : 'change', renderUsers)
+      );
+
+      ['user-modal','delete-user-modal'].forEach(id => {
+        document.getElementById(id).addEventListener('click', function (e) {
+          if (e.target === this) { this.classList.remove('open'); pendingDeleteUserId = null; }
+        });
+      });
+
+      // ── Initial render ──────────────────────────────────────
+      renderOverview();
+    })();
+  </script>
+</body>
+</html>

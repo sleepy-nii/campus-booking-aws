@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Security Groups for Campus Booking — ALB, EC2 app, and RDS.
+  Principle: least-privilege ingress; only ALB → EC2 → RDS.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: campus-booking
+
+Resources:
+
+  # ALB — accepts HTTPS (443) from the internet only
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB - HTTPS from internet
+      VpcId: !ImportValue
+        Fn::Sub: '${EnvironmentName}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS from internet
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP redirect to HTTPS
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-alb-sg'
+
+  # EC2 app — accepts port 3000 from ALB only
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EC2 app - from ALB only
+      VpcId: !ImportValue
+        Fn::Sub: '${EnvironmentName}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+          Description: App traffic from ALB
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-app-sg'
+
+  # RDS — accepts MySQL (3306) from EC2 app only
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS MySQL - from EC2 app only
+      VpcId: !ImportValue
+        Fn::Sub: '${EnvironmentName}-VpcId'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: MySQL from app tier
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-rds-sg'
+
+Outputs:
+  AlbSgId:
+    Value: !Ref AlbSecurityGroup
+    Export:
+      Name: !Sub '${EnvironmentName}-AlbSgId'
+  AppSgId:
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: !Sub '${EnvironmentName}-AppSgId'
+  RdsSgId:
+    Value: !Ref RdsSecurityGroup
+    Export:
+      Name: !Sub '${EnvironmentName}-RdsSgId'

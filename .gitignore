@@ -1,0 +1,20 @@
+# Environment / secrets
+.env
+.env.local
+*.pem
+*.key
+*.p12
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build / temp
+dist/
+*.tmp
+*.log
+security-test-report-*.txt
+
+# OS
+.DS_Store
+Thumbs.db

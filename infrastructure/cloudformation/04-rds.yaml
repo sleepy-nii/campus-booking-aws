@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Amazon RDS MySQL 8.0 — Single-AZ, encrypted at rest (AES256),
+  in private DB subnets. Password passed as parameter.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: campus-booking
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+  DBName:
+    Type: String
+    Default: CampusBookingDB
+  DBMasterUsername:
+    Type: String
+    Default: admin
+  DBMasterPassword:
+    Type: String
+    NoEcho: true
+    Default: CampusBooking2025!
+
+Resources:
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for RDS
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: '${EnvironmentName}-PrivateDbSubnet1'
+        - !ImportValue
+          Fn::Sub: '${EnvironmentName}-PrivateDbSubnet2'
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-db-subnet-group'
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub '${EnvironmentName}-mysql'
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: mysql
+      EngineVersion: '8.0'
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !ImportValue
+          Fn::Sub: '${EnvironmentName}-RdsSgId'
+      MultiAZ: false
+      StorageType: gp2
+      AllocatedStorage: '20'
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      DeletionProtection: false
+      EnableCloudwatchLogsExports:
+        - error
+        - slowquery
+      AutoMinorVersionUpgrade: true
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentName}-rds'
+
+Outputs:
+  DBEndpoint:
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub '${EnvironmentName}-DBEndpoint'
+  DBName:
+    Value: !Ref DBName
+    Export:
+      Name: !Sub '${EnvironmentName}-DBName'

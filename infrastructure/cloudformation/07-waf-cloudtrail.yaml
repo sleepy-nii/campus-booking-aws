@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS WAF v2 (attached to ALB) + CloudTrail + CloudWatch alarms.
+  WAF rules: SQL injection, XSS, rate limiting, AWS Managed Rules.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: campus-booking
+  AlbArn:
+    Type: String
+    Description: ARN of the ALB (from stack 05)
+  AlertEmail:
+    Type: String
+    Description: Email address for CloudWatch alarm notifications
+
+Resources:
+
+  # ── WAF v2 ────────────────────────────────────────────────────────────────
+  WebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub '${EnvironmentName}-web-acl'
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      Rules:
+        # AWS Managed Common Rule Set
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 0
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedCommon
+
+        # AWS Managed SQL Injection Rule Set
+        - Name: AWSManagedRulesSQLi
+          Priority: 1
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedSQLi
+
+        # AWS Known Bad Inputs
+        - Name: AWSManagedRulesKnownBadInputs
+          Priority: 2
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedBadInputs
+
+        # Rate limiting — 1000 req/5 min per IP
+        - Name: RateLimitRule
+          Priority: 3
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 1000
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitRule
+
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub '${EnvironmentName}-web-acl'
+
+  WebACLAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Ref AlbArn
+      WebACLArn: !GetAtt WebACL.Arn
+
+  # WAF logging to S3 via Kinesis Firehose
+  WafLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub 'aws-waf-logs-${EnvironmentName}'
+      RetentionInDays: 90
+
+  WAFLoggingConfig:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt WebACL.Arn
+      LogDestinationConfigs:
+        - !GetAtt WafLogGroup.Arn
+
+  # ── CloudTrail ────────────────────────────────────────────────────────────
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: CloudTrailBucketWaitHandle
+    Properties:
+      TrailName: !Sub '${EnvironmentName}-trail'
+      S3BucketName: !ImportValue
+        Fn::Sub: '${EnvironmentName}-CloudTrailBucket'
+      IsLogging: true
+      IsMultiRegionTrail: false
+      IncludeGlobalServiceEvents: true
+      EnableLogFileValidation: true
+      EventSelectors:
+        - ReadWriteType: All
+          IncludeManagementEvents: true
+
+  # Dummy resource to ensure S3 bucket policy is ready before CloudTrail
+  CloudTrailBucketWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  CloudTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/cloudtrail/${EnvironmentName}'
+      RetentionInDays: 365
+
+  # ── CloudWatch Alarms ─────────────────────────────────────────────────────
+  AlarmSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${EnvironmentName}-security-alerts'
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  # Alarm: WAF blocks spike (possible attack)
+  WafBlockAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvironmentName}-waf-blocks-high'
+      AlarmDescription: WAF blocked more than 100 requests in 5 minutes
+      MetricName: BlockedRequests
+      Namespace: AWS/WAFV2
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 100
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: WebACL
+          Value: !Sub '${EnvironmentName}-web-acl'
+        - Name: Region
+          Value: !Ref AWS::Region
+        - Name: Rule
+          Value: ALL
+      AlarmActions:
+        - !Ref AlarmSNSTopic
+
+  # Alarm: EC2 CPU high
+  EC2CpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvironmentName}-ec2-cpu-high'
+      AlarmDescription: EC2 CPU utilisation above 80%
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmSNSTopic
+
+  # Alarm: RDS connections high
+  RdsConnectionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${EnvironmentName}-rds-connections-high'
+      AlarmDescription: RDS connection count above 50
+      MetricName: DatabaseConnections
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmSNSTopic
+
+Outputs:
+  WebACLArn:
+    Value: !GetAtt WebACL.Arn
+    Export:
+      Name: !Sub '${EnvironmentName}-WebACLArn'
+  AlarmTopicArn:
+    Value: !Ref AlarmSNSTopic
+    Export:
+      Name: !Sub '${EnvironmentName}-AlarmTopicArn'

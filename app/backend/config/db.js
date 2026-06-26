@@ -10,7 +10,7 @@ async function getPool() {
       database:           process.env.DB_NAME     || 'CampusBookingDB',
       user:               process.env.DB_USER     || 'admin',
       password:           process.env.DB_PASSWORD || '',
-      ssl:                process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : undefined,
+      ssl:                { rejectUnauthorized: false },
       waitForConnections: true,
       connectionLimit:    10,
       queueLimit:         0,

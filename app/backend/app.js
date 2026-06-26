@@ -21,15 +21,13 @@ app.use(helmet({
 
 app.use(express.json());
 
-const isProduction = process.env.NODE_ENV === 'production';
-
 app.use(session({
   secret:            process.env.SESSION_SECRET || 'crb-dev-secret-change-in-prod',
   resave:            false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure:   isProduction,  // HTTPS-only in production (behind ALB with SSL termination)
+    secure:   false,
     sameSite: 'lax',
     maxAge:   24 * 60 * 60 * 1000,
   },

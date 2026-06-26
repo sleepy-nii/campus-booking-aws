@@ -15,6 +15,7 @@ const app = express();
 // Security headers
 app.set('trust proxy', 1); // Required when behind ALB/ELB
 app.use(helmet({
+  hsts: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

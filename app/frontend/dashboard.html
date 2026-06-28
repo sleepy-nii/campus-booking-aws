@@ -122,7 +122,7 @@
       if (!user) return;
       if (user.role === 'Admin') { window.location.href = 'admin.html'; return; }
       initNavbar(user);
-      document.getElementById('welcome-msg').textContent = `Welcome back, ${user.fullName.split(' ')[0]}!`;
+      document.getElementById('welcome-msg').textContent = `Welcome back, ${user.fullName}!`;
 
       const [resources, bookings] = await Promise.all([
         API.get('/resources'),

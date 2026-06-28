@@ -526,7 +526,7 @@
           </tr>`;
         }).join('');
 
-        const recent = [...bookings].reverse().slice(0, 8);
+        const recent = [...bookings].slice(0, 8);
         document.getElementById('recent-activity').innerHTML = recent.length
           ? recent.map(b => {
               const res = resourceById(b.resourceId);

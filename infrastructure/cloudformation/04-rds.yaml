@@ -55,12 +55,9 @@ Resources:
       StorageType: gp2
       AllocatedStorage: '20'
       StorageEncrypted: false
-      BackupRetentionPeriod: 7
+      BackupRetentionPeriod: 0
       DeletionProtection: false
-      EnableCloudwatchLogsExports:
-        - error
-        - slowquery
-      AutoMinorVersionUpgrade: true
+      AutoMinorVersionUpgrade: false
       PubliclyAccessible: false
       Tags:
         - Key: Name

@@ -10,10 +10,20 @@ router.get('/', requireAuth, async (req, res) => {
     const user = req.session.user;
     let rows;
     if (user.role === 'Admin') {
-      [rows] = await pool.execute('SELECT * FROM Bookings ORDER BY createdAt DESC');
+      [rows] = await pool.execute(`
+        SELECT b.*, u.fullName AS userName, r.name AS resourceName, r.category AS resourceCategory, r.icon AS resourceIcon
+        FROM Bookings b
+        LEFT JOIN Users u ON b.userId = u.id
+        LEFT JOIN Resources r ON b.resourceId = r.id
+        ORDER BY b.createdAt DESC
+      `);
     } else {
       [rows] = await pool.execute(
-        'SELECT * FROM Bookings WHERE userId = ? ORDER BY createdAt DESC',
+        `SELECT b.*, u.fullName AS userName, r.name AS resourceName, r.category AS resourceCategory, r.icon AS resourceIcon
+         FROM Bookings b
+         LEFT JOIN Users u ON b.userId = u.id
+         LEFT JOIN Resources r ON b.resourceId = r.id
+         WHERE b.userId = ? ORDER BY b.createdAt DESC`,
         [user.id]
       );
     }

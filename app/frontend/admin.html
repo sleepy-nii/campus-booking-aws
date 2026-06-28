@@ -529,11 +529,9 @@
         const recent = [...bookings].slice(0, 8);
         document.getElementById('recent-activity').innerHTML = recent.length
           ? recent.map(b => {
-              const res = resourceById(b.resourceId);
-              const u   = userById(b.userId);
               return `<tr>
-                <td><span class="user-pill">👤 ${u.fullName}</span></td>
-                <td>${res.icon || '📦'} ${res.name || 'Unknown'}</td>
+                <td><span class="user-pill">👤 ${b.userName || 'Unknown'}</span></td>
+                <td>${b.resourceIcon || '📦'} ${b.resourceName || 'Unknown'}</td>
                 <td style="font-size:.83rem;">${fmt(b.startTime)}</td>
                 <td style="font-size:.83rem;">${fmt(b.endTime)}</td>
                 <td>${statusBadge(b.status)}</td>

@@ -54,7 +54,7 @@ Resources:
       MultiAZ: false
       StorageType: gp2
       AllocatedStorage: '20'
-      StorageEncrypted: true
+      StorageEncrypted: false
       BackupRetentionPeriod: 7
       DeletionProtection: false
       EnableCloudwatchLogsExports:

@@ -120,15 +120,9 @@
     (async () => {
       const user = Session.require();
       if (!user) return;
+      if (user.role === 'Admin') { window.location.href = 'admin.html'; return; }
       initNavbar(user);
       document.getElementById('welcome-msg').textContent = `Welcome back, ${user.fullName.split(' ')[0]}!`;
-
-      if (user.role === 'Admin') {
-        document.querySelectorAll('a[href="booking.html"], a[href="my-bookings.html"]').forEach(el => {
-          el.style.display = 'none';
-        });
-        document.getElementById('recent-table').closest('.card').style.display = 'none';
-      }
 
       const [resources, bookings] = await Promise.all([
         API.get('/resources'),

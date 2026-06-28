@@ -82,10 +82,16 @@ function initNavbar(user) {
   const onAdminPage = window.location.pathname.split('/').pop() === 'admin.html';
   if (user.role === 'Admin' && !onAdminPage) {
     const nav = document.querySelector('.navbar-nav');
-    if (nav && !nav.querySelector('[href="admin.html"]')) {
-      const li = document.createElement('li');
-      li.innerHTML = '<a href="admin.html" style="background:rgba(204,0,0,.25);">⚙️ Admin</a>';
-      nav.appendChild(li);
+    if (nav) {
+      // Hide faculty-only nav items
+      nav.querySelectorAll('a[href="booking.html"], a[href="my-bookings.html"]').forEach(a => {
+        a.closest('li').style.display = 'none';
+      });
+      if (!nav.querySelector('[href="admin.html"]')) {
+        const li = document.createElement('li');
+        li.innerHTML = '<a href="admin.html" style="background:rgba(204,0,0,.25);">⚙️ Admin</a>';
+        nav.appendChild(li);
+      }
     }
   }
 

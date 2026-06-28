@@ -1,11 +1,9 @@
 const express = require('express');
-const crypto  = require('crypto');
+const bcrypt  = require('bcrypt');
 const { getPool } = require('../config/db');
 const router = express.Router();
 
-function sha512(plain) {
-  return crypto.createHash('sha512').update(plain, 'utf8').digest('hex');
-}
+const SALT_ROUNDS = 12;
 
 async function writeAuditLog(pool, email, action, status, ip) {
   try {
@@ -40,7 +38,8 @@ router.post('/login', async (req, res) => {
       return res.status(423).json({ error: 'Account is temporarily locked. Please try again later.' });
     }
 
-    if (sha512(password) !== user.password) {
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
       await pool.execute('UPDATE Users SET failedAttempts = failedAttempts + 1 WHERE id = ?', [user.id]);
       // Lock after 5 failed attempts
       if (user.failedAttempts + 1 >= 5) {

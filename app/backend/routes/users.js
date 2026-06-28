@@ -1,12 +1,10 @@
 const express = require('express');
-const crypto  = require('crypto');
+const bcrypt  = require('bcrypt');
 const { getPool } = require('../config/db');
 const { requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-function sha512(plain) {
-  return crypto.createHash('sha512').update(plain, 'utf8').digest('hex');
-}
+const SALT_ROUNDS = 12;
 
 // GET /api/users
 router.get('/', requireAdmin, async (req, res) => {
@@ -33,7 +31,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const [dup] = await pool.execute('SELECT 1 FROM Users WHERE email = ?', [email.trim().toLowerCase()]);
     if (dup.length) return res.status(409).json({ error: 'Email already registered.' });
 
-    const hash = sha512(password);
+    const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const [result] = await pool.execute(
       'INSERT INTO Users (fullName, email, password, role) VALUES (?, ?, ?, ?)',
       [fullName.trim(), email.trim().toLowerCase(), hash, role]
@@ -65,7 +63,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (dup.length) return res.status(409).json({ error: 'Email already registered.' });
 
     if (password) {
-      const hash = sha512(password);
+      const hash = await bcrypt.hash(password, SALT_ROUNDS);
       await pool.execute(
         'UPDATE Users SET fullName=?, email=?, role=?, password=? WHERE id=?',
         [fullName.trim(), email.trim().toLowerCase(), role, hash, id]

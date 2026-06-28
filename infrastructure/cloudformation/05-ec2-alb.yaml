@@ -79,8 +79,7 @@ Resources:
         ImageId: !Ref AmiId
         InstanceType: !Ref InstanceType
         IamInstanceProfile:
-          Arn: !ImportValue
-            Fn::Sub: '${EnvironmentName}-EC2InstanceProfileArn'
+          Name: LabInstanceProfile
         SecurityGroupIds:
           - !ImportValue
             Fn::Sub: '${EnvironmentName}-AppSgId'
@@ -103,30 +102,26 @@ Resources:
             yum install -y nodejs git
 
             # Clone application
-            cd /opt
-            git clone https://github.com/YOUR_ORG/campus-booking-aws.git campus-booking
-            cd campus-booking/app/backend
-            npm ci --production
+            git clone https://github.com/sleepy-nii/campus-booking-aws.git /opt/campus-booking
+            cd /opt/campus-booking/app/backend
+            npm install --production
 
             # Write environment config
             SESSION_SECRET=$(openssl rand -hex 32)
-            cat > /opt/campus-booking/.env <<EOF
-            NODE_ENV=production
+            cat > /opt/campus-booking/.env << 'ENVEOF'
+            NODE_ENV=development
             PORT=3000
             DB_HOST=${DbEndpoint}
             DB_NAME=CampusBookingDB
             DB_USER=${DBMasterUsername}
             DB_PASSWORD=${DBMasterPassword}
-            DB_SSL=true
+            DB_SSL=false
             AWS_REGION=${AWS::Region}
-            SESSION_SECRET=$SESSION_SECRET
-            EOF
+            ENVEOF
+            echo "SESSION_SECRET=$SESSION_SECRET" >> /opt/campus-booking/.env
 
-            # Start with pm2
-            npm install -g pm2
-            pm2 start /opt/campus-booking/app/backend/app.js --name campus-booking
-            pm2 startup systemd -u root --hp /root
-            pm2 save
+            # Start app
+            nohup node /opt/campus-booking/app/backend/app.js >> /tmp/app.log 2>&1 &
 
   # ── Auto Scaling Group ────────────────────────────────────────────────────
   AppASG:

@@ -500,32 +500,6 @@
             <div class="stat-info"><div class="value">${maintRes}</div><div class="label">Under Maintenance</div></div></div>
         `;
 
-        const total    = bookings.length || 1;
-        const statuses = ['Confirmed', 'Cancelled'];
-        const colors   = { Confirmed: '#16a34a', Cancelled: '#dc2626' };
-
-        document.getElementById('status-breakdown').innerHTML = statuses.map(s => {
-          const n   = bookings.filter(b => b.status === s).length;
-          const pct = Math.round((n / total) * 100);
-          return `<div style="flex:1;min-width:140px;background:#f8fafc;border-radius:10px;padding:16px 18px;border:1px solid var(--border);">
-            <div style="font-size:1.6rem;font-weight:700;color:${colors[s]}">${n}</div>
-            <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px;">${s}</div>
-            <div style="margin-top:8px;height:6px;background:#e5e7eb;border-radius:3px;">
-              <div style="height:100%;width:${pct}%;background:${colors[s]};border-radius:3px;"></div>
-            </div>
-            <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px;">${pct}%</div>
-          </div>`;
-        }).join('');
-
-        document.getElementById('status-table').innerHTML = statuses.map(s => {
-          const n = bookings.filter(b => b.status === s).length;
-          return `<tr>
-            <td>${statusBadge(s)}</td>
-            <td><strong>${n}</strong></td>
-            <td>${Math.round((n / total) * 100)}%</td>
-          </tr>`;
-        }).join('');
-
         const recent = [...bookings].slice(0, 8);
         document.getElementById('recent-activity').innerHTML = recent.length
           ? recent.map(b => {

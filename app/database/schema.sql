@@ -86,14 +86,14 @@ DELIMITER ;
 -- Admin@123 → SHA-512
 -- Faculty@123 → SHA-512
 
-INSERT IGNORE INTO Users (fullName, email, password, role)
-VALUES
-  ('Administrator', 'admin@mmu.edu.my',
-   SHA2(CONVERT('Admin@123' USING utf8mb4), 512),
-   'Admin'),
-  ('Faculty User', 'faculty@mmu.edu.my',
-   SHA2(CONVERT('Faculty@123' USING utf8mb4), 512),
-   'Faculty');
+INSERT INTO Users (fullName, email, password, role) VALUES
+('Administrator', 'admin@mmu.edu.my', '$2b$12$3FmSvjCjFZUYKZpJoxgVMuyFXkXHbGPxMRMseQLBEbr7dWy90y6Ku', 'Admin'),
+('Faculty User', 'faculty@mmu.edu.my', '$2b$12$TtbILmnqjZFhy/KEp.AuhuKxMTLuFlFtvjyHB9M3Sr/9VnhQ8Vkrq', 'Faculty'),
+('Dr. Nava Sharma', 'nava.sharma@mmu.edu.my', '$2b$12$1qCzUoea43rguk6Y8AbhYebGlZRglxJgs6B0fSEn7d05LVX2YaPwu', 'Faculty'),
+('Dr. Lee Wei Kang', 'lee.weikang@mmu.edu.my', '$2b$12$Vcigi462EXTP3dYe/npSLOdaXNXz7u6cACLloxet8I03GsRJzGl5G', 'Faculty'),
+('Boo Cornie', 'cornie@student.mmu.edu.my', '$2b$12$kIqpDJU4i1hSOCohu7q7HutXUiaTo8L4QP2eOT3G3gbHY0RjQqS5.', 'Faculty'),
+('Koh Yue', 'kohyue@student.mmu.edu.my', '$2b$12$qlvM9uCiFak4LK..pJg8CeYmuLCne/JQpAa9sUkUZ2kmiH1lrvnWa', 'Faculty')
+ON DUPLICATE KEY UPDATE password=VALUES(password);
 
 INSERT IGNORE INTO Resources (name, category, capacity, status, icon)
 VALUES
@@ -101,4 +101,5 @@ VALUES
   ('Computer Lab 1',    'Lab',           30, 'Active',      '💻'),
   ('Meeting Room 101',  'Meeting Room',  10, 'Active',      '🤝'),
   ('Auditorium',        'Auditorium',   300, 'Active',      '🎭'),
-  ('Sports Hall',       'Sports',       200, 'Maintenance', '⚽');
+  ('Sports Hall',       'Sports',       200, 'Maintenance', '⚽'),
+  ('Meeting Room B', 'Meeting Room', 10, 'Active', '🗂️');

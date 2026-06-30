@@ -5,6 +5,16 @@ const router = express.Router();
 
 const SALT_ROUNDS = 12;
 
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts from this IP. Please try again later.' },
+});
+
 async function writeAuditLog(pool, email, action, status, ip) {
   try {
     await pool.execute(
@@ -15,7 +25,7 @@ async function writeAuditLog(pool, email, action, status, ip) {
 }
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
     return res.status(400).json({ error: 'Email and password are required.' });
